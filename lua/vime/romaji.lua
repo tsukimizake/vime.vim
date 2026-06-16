@@ -1,5 +1,7 @@
 -- ローマ字 → かな 変換 (wapuro ローマ字)
 -- 純粋関数。FFI 非依存。to_kana(romaji) -> ひらがな を返す。
+-- カスタムローマ字テーブル(act 等)を使いたい場合は to_kana の第2引数に渡す。
+-- 撥音(ん)・促音(っ)・大文字英字ランの look-ahead ロジックはテーブル非依存で常に同じ。
 local M = {}
 
 local T = {
@@ -213,6 +215,10 @@ expand("dh", "で", SMALL_Y)
 expand("fy", "ふ", SMALL_Y)
 expand("vy", "ゔ", SMALL_Y)
 
+-- 既定ローマ字テーブル(wapuro)。カスタムテーブルを作るときの参照や、
+-- ユーザがマージしたい場合のベースとして公開する(読み取り専用扱いを推奨)。
+M.default_table = T
+
 local function is_consonant(ch)
   return ch:match("[bcdfghjkmpqrstvwxyz]") ~= nil
 end
@@ -221,7 +227,10 @@ local function is_vowel(ch)
 end
 
 -- ローマ字列をひらがなへ変換する。大文字は小文字化して扱う。
-function M.to_kana(s)
+-- custom_table 省略時は wapuro(M.default_table)。act 等の独自配列を使うときに渡す。
+-- 撥音 ん・促音 っ の look-ahead と最長一致のロジック自体はテーブル非依存で共通。
+function M.to_kana(s, custom_table)
+  local tbl = custom_table or T
   s = s:lower()
   local out = {}
   local i, n = 1, #s
@@ -279,8 +288,8 @@ function M.to_kana(s)
       local matched = false
       for len = 4, 1, -1 do
         local seg = s:sub(i, i + len - 1)
-        if T[seg] then
-          out[#out + 1] = T[seg]
+        if tbl[seg] then
+          out[#out + 1] = tbl[seg]
           i = i + len
           matched = true
           break

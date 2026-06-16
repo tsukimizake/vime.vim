@@ -211,3 +211,37 @@ describe("vime.romaji.to_kana", function()
     assert.are.equal("きょうはいいてんきだね", romaji.to_kana("kyouhaiitenkidane"))
   end)
 end)
+
+describe("vime.romaji.to_kana with custom table", function()
+  it("uses the given table instead of the default (full replacement)", function()
+    -- 完全置換: 既定にあるエントリでも custom_table に無ければマッチしない
+    local custom = { ki = "き", ku = "く" }
+    assert.are.equal("き", romaji.to_kana("ki", custom))
+    assert.are.equal("く", romaji.to_kana("ku", custom))
+    -- "ka" は custom に無い → 既定にあっても fallback しない(完全置換) → 生のまま
+    assert.are.equal("ka", romaji.to_kana("ka", custom))
+    assert.are.equal("a", romaji.to_kana("a", custom))
+  end)
+
+  it("keeps hatsuon/sokuon look-ahead logic regardless of the table", function()
+    -- 撥音 ん・促音 っ・大文字英字ランの判定はテーブル非依存で常に有効
+    local custom = { a = "ア", ka = "カ", ki = "キ" }
+    -- 撥音(n → ん): な行が table に無くてもロジックは ん を出す。
+    -- ただし n+vowel は fall-through、最長一致で見て tbl[na] が無いので "n" "a" と分解されて
+    -- "n" の最長一致も失敗するため最終的に生のまま出る → ここでは "nn" 系で検証
+    assert.are.equal("んカ", romaji.to_kana("nnka", custom))
+    -- 促音 っ: ka が同子音連続(kka)で っ が前置される
+    assert.are.equal("っカ", romaji.to_kana("kka", custom))
+  end)
+
+  it("exposes the default table as romaji.default_table", function()
+    assert.is_table(romaji.default_table)
+    assert.are.equal("あ", romaji.default_table.a)
+    assert.are.equal("きょ", romaji.default_table.kyo)
+  end)
+
+  it("falls back to the default table when custom_table is nil", function()
+    assert.are.equal("きょう", romaji.to_kana("kyou", nil))
+    assert.are.equal("きょう", romaji.to_kana("kyou")) -- 引数省略でも同じ
+  end)
+end)
