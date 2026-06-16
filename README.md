@@ -38,7 +38,7 @@ meson compile -C build && meson install -C build
 - `--sysconfdir` は**絶対パス必須**（相対だと `anthy_init` が設定ファイルを見つけられず失敗する）。
 - 共有ライブラリは原 anthy と区別するため `libanthy-unicode.dylib` という名前で入る。
 - 学習データは `$XDG_CONFIG_HOME/anthy`（未設定なら `~/.config/anthy`）に保存される（原 anthy の `~/.anthy` から移行）。
-- 変換精度などの詳細は [`poc/FINDINGS.md`](poc/FINDINGS.md) を参照
+- 変換精度などの検証結果は [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §11 を参照
 
 ## セットアップ
 
@@ -97,7 +97,7 @@ require("vime").setup({
 | `<C-w>` / `<C-u>` | 未確定/変換中  | 未確定をクリア（無ければ通常の単語/行削除）                      |
 | `<Esc>`           | 変換中/未確定  | 確定して挿入モードを抜ける                                       |
 
-キーマップ・候補一覧の閾値・ラベルは `setup()` で変更できる（[`docs/DESIGN.md`](docs/DESIGN.md) §7）。
+キーマップ・候補一覧の閾値・ラベルは `setup()` で変更できる（[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §8）。
 
 ## 開発
 
@@ -105,4 +105,4 @@ require("vime").setup({
 make test   # plenary.nvim でテスト実行
 ```
 
-設計は [`docs/DESIGN.md`](docs/DESIGN.md)、用語は [`docs/GLOSSARY.md`](docs/GLOSSARY.md)。
+設計・実装は [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)、用語は [`docs/GLOSSARY.md`](docs/GLOSSARY.md)。
