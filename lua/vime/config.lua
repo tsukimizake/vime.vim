@@ -22,13 +22,41 @@ M.defaults = {
   },
 }
 
--- anthy ライブラリの既知パス候補。
-M.lib_candidates = {
-  "/nix/store/m2z37mlz9rsh2azv9pny1860rpycic54-anthy-9100h/lib/libanthy.dylib",
-  "/opt/homebrew/lib/libanthy.dylib",
-  "/usr/local/lib/libanthy.dylib",
-  "/usr/lib/libanthy.so",
-}
+-- OS ごとの共有ライブラリ拡張子(macOS=dylib / その他=so)。
+local function lib_ext()
+  return (jit.os == "OSX") and "dylib" or "so"
+end
+
+-- anthy 共有ライブラリの既定探索候補を構築する。
+-- 推奨の anthy-unicode(別名 libanthy-unicode)を各 dir で優先し、原 anthy(libanthy)も探す。
+function M.lib_candidates()
+  local ext = lib_ext()
+  local names = { "libanthy-unicode." .. ext, "libanthy." .. ext } -- unicode を優先
+  local dirs = {
+    vim.fn.expand("~/.local/lib"),       -- ソースビルド(--prefix=$HOME/.local)
+    vim.fn.expand("~/.nix-profile/lib"), -- nix profile install
+    "/run/current-system/sw/lib",        -- nix-darwin / NixOS
+    "/opt/homebrew/lib",                 -- macOS Homebrew
+    "/usr/local/lib",                    -- ソースビルド既定(prefix=/usr/local)
+    "/usr/lib",                          -- 一般
+    "/usr/lib64",                        -- Fedora
+    "/usr/lib/x86_64-linux-gnu",         -- Debian/Ubuntu amd64
+    "/usr/lib/aarch64-linux-gnu",        -- Debian/Ubuntu arm64
+  }
+  local list = {}
+  for _, dir in ipairs(dirs) do
+    for _, name in ipairs(names) do
+      list[#list + 1] = dir .. "/" .. name
+    end
+  end
+  -- nix ストアはハッシュが変わるので glob で拾う(特定ハッシュに依存しない)。
+  for _, name in ipairs(names) do
+    for _, hit in ipairs(vim.fn.glob("/nix/store/*-anthy*/lib/" .. name, false, true)) do
+      list[#list + 1] = hit
+    end
+  end
+  return list
+end
 
 -- defaults へ user を再帰マージした新しいテーブルを返す。
 function M.merge(user)
@@ -51,9 +79,17 @@ function M.merge(user)
   return deep(M.defaults, user)
 end
 
--- candidates(省略時は既知パス)のうち最初に存在するパスを返す。無ければ nil。
+-- anthy 共有ライブラリのパスを解決する。最初に存在したパスを返し、無ければ nil。
+-- candidates 省略時(=既定探索)は環境変数 VIME_ANTHY_LIB → 既定候補の順で探す。
+-- candidates 明示時はそのリストのみを走査する(テスト用)。
 function M.find_anthy_lib(candidates)
-  candidates = candidates or M.lib_candidates
+  if candidates == nil then
+    local env = vim.env.VIME_ANTHY_LIB
+    if env and env ~= "" and vim.fn.filereadable(env) == 1 then
+      return env
+    end
+    candidates = M.lib_candidates()
+  end
   for _, path in ipairs(candidates) do
     if vim.fn.filereadable(path) == 1 then
       return path

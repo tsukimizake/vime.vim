@@ -10,6 +10,31 @@ local keymap = require("vime.keymap")
 local api = vim.api
 local M = {}
 
+-- libanthy 未検出時の OS 別導入案内メッセージ。os 省略時は実行環境を使う。
+-- 推奨は現役保守の anthy-unicode(ABI 互換)。
+function M.install_hint(os)
+  os = os or jit.os
+  local tail = "導入後に自動検出されない場合は setup({ anthy = { lib = ... } }) か環境変数 $VIME_ANTHY_LIB でパス指定"
+  if os == "OSX" then
+    return table.concat({
+      "vime: libanthy が見つかりません。anthy-unicode の導入を推奨します(macOS):",
+      "  git clone https://github.com/fujiwarat/anthy-unicode && cd anthy-unicode",
+      "  meson setup build --prefix=$HOME/.local --sysconfdir=$HOME/.local/etc -Demacs=disabled",
+      "  meson compile -C build && meson install -C build   # ~/.local/lib/libanthy-unicode.dylib を自動検出",
+      "  ※ --sysconfdir は絶対パス必須(相対だと anthy_init 失敗)。meson/ninja は nix shell 等で用意",
+      "  簡易には nix profile install nixpkgs#anthy も可(9100h・ABI 互換)",
+      "  " .. tail,
+    }, "\n")
+  end
+  return table.concat({
+    "vime: libanthy が見つかりません。anthy-unicode の導入を推奨します(Linux):",
+    "  Fedora: sudo dnf install anthy-unicode",
+    "  Debian/Ubuntu: sudo apt install libanthy-dev",
+    "  Arch(AUR): anthy-unicode",
+    "  " .. tail,
+  }, "\n")
+end
+
 -- コントローラの状態
 local st = {
   cfg = nil,
@@ -322,7 +347,7 @@ end
 -- 日本語入力 ON/OFF をトグルする。
 function M.toggle()
   if not st.anthy_ok then
-    vim.notify("vime: libanthy をロードできません。anthy.lib を確認してください", vim.log.levels.WARN)
+    vim.notify(M.install_hint(), vim.log.levels.WARN)
     return
   end
   if st.enabled then
@@ -343,7 +368,7 @@ function M.setup(opts)
   local lib = st.cfg.anthy.lib or config.find_anthy_lib()
   st.anthy_ok = lib ~= nil and anthy.setup(lib)
   if not st.anthy_ok then
-    vim.notify("vime: libanthy が見つかりません。anthy.lib を設定してください", vim.log.levels.WARN)
+    vim.notify(M.install_hint(), vim.log.levels.WARN)
   end
   vim.keymap.set("i", st.cfg.keymaps.toggle, M.toggle, { desc = "vime: toggle japanese input" })
 
