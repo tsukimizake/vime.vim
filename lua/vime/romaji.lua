@@ -110,4 +110,32 @@ function M.to_kana(s)
   return table.concat(out)
 end
 
+-- ひらがな(U+3041-U+3096)をカタカナ(+0x60)へ変換する。それ以外の文字はそのまま。
+function M.to_katakana(s)
+  local out = {}
+  local i, n = 1, #s
+  while i <= n do
+    local b1 = s:byte(i)
+    if b1 >= 0xE0 and b1 < 0xF0 and i + 2 <= n then
+      local b2, b3 = s:byte(i + 1), s:byte(i + 2)
+      local cp = (b1 - 0xE0) * 0x1000 + (b2 - 0x80) * 0x40 + (b3 - 0x80)
+      if cp >= 0x3041 and cp <= 0x3096 then
+        cp = cp + 0x60
+        out[#out + 1] = string.char(
+          0xE0 + math.floor(cp / 0x1000),
+          0x80 + math.floor(cp / 0x40) % 0x40,
+          0x80 + cp % 0x40
+        )
+      else
+        out[#out + 1] = s:sub(i, i + 2)
+      end
+      i = i + 3
+    else
+      out[#out + 1] = s:sub(i, i)
+      i = i + 1
+    end
+  end
+  return table.concat(out)
+end
+
 return M

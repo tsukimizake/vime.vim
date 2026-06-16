@@ -201,6 +201,18 @@ function M.on_backspace()
   render()
 end
 
+-- F7: 現在の読みをカタカナに変換して確定する。
+function M.on_katakana()
+  if not st.enabled then
+    return
+  end
+  sync_anchor()
+  local kata = st.session:commit_katakana()
+  if kata ~= "" then
+    finalize(kata)
+  end
+end
+
 -- C-w(単語削除)/C-u(行削除)。未確定があれば IME のキャンセル、無ければ素通し。
 function M.on_kill(key)
   if not st.enabled then
@@ -274,6 +286,7 @@ local function handlers()
     prev_segment = M.on_prev_segment,
     expand = M.on_expand,
     shrink = M.on_shrink,
+    katakana = M.on_katakana,
     kill = M.on_kill,
   }
 end

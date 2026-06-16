@@ -36,6 +36,7 @@ function M.attach(buf, config, handlers)
   map(km.prev_segment, handlers.prev_segment)
   map(km.expand, handlers.expand)
   map(km.shrink, handlers.shrink)
+  map(km.katakana, handlers.katakana)
   map("<BS>", handlers.backspace)
   map("<C-h>", handlers.backspace) -- 端末によっては Backspace が C-h
   map("<C-w>", function() handlers.kill("<C-w>") end) -- 単語削除

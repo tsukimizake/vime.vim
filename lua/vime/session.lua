@@ -227,6 +227,20 @@ function Session:clear()
   reset_composing(self)
 end
 
+-- 現在の読み(かな)をカタカナに変換して確定する文字列を返す。
+-- composing/converting どちらでも読み(romaji 由来)で動く。英字ラン/空なら "" を返す。
+function Session:commit_katakana()
+  if self._latin then
+    return ""
+  end
+  local reading = romaji.to_kana(self.romaji)
+  if reading == "" then
+    return ""
+  end
+  reset_composing(self)
+  return romaji.to_katakana(reading)
+end
+
 -- 取消。converting なら変換前のかな(composing)へ戻す。composing なら未確定を破棄。
 function Session:cancel()
   if self._state == "converting" then
