@@ -1,0 +1,157 @@
+*vime.txt*	挿入モードのまま日本語入力できるモード式 IME
+
+Author:  skanehira <factx.skanehira@gmail.com>
+License: MIT License (see |vime-license|)
+
+==============================================================================
+CONTENTS						*vime* *vime-contents*
+
+	1. 概要 ............................. |vime-introduction|
+	2. 必要環境 ......................... |vime-requirements|
+	3. セットアップ ..................... |vime-setup|
+	4. 設定 ............................. |vime-configuration|
+	5. 使い方 ........................... |vime-usage|
+	6. キーマッピング ................... |vime-mappings|
+	7. ハイライト ....................... |vime-highlights|
+	8. ライセンス ....................... |vime-license|
+
+==============================================================================
+1. 概要							*vime-introduction*
+
+vime.vim は挿入モードのまま、OS の IME を切り替えずに日本語を入力できる
+Neovim プラグイン（モード式 IME）。pure Lua(LuaJIT) + libanthy(FFI) で完結し、
+外部プロセスを起動しない。変換は 2 段構成: >
+
+	kyouhaiitenkidane → きょうはいいてんきだね → 今日はいい天気だね
+	       ①ローマ字→かな(自前)      ②かな→漢字(Anthy)
+<
+①ローマ字→かなは自前の純粋関数、②かな→漢字（連文節変換・候補・学習）は
+Anthy の共有ライブラリを LuaJIT FFI で直接呼び出す。
+
+実装の詳細は docs/ARCHITECTURE.md、用語は docs/GLOSSARY.md を参照。
+
+==============================================================================
+2. 必要環境						*vime-requirements*
+
+- Neovim 0.10+ (LuaJIT)
+- libanthy（共有ライブラリ）
+
+現役で保守されている anthy-unicode を推奨する（オリジナルの anthy 9100h は
+更新停止。ABI 互換なのでどちらでも動く）。OS 別の導入手順は README を参照。
+
+	Fedora          sudo dnf install anthy-unicode
+	Debian/Ubuntu   sudo apt install libanthy-dev
+	Arch (AUR)      anthy-unicode
+	Nix             nix profile install nixpkgs#anthy（または宣言的に追加）
+	macOS           anthy-unicode をソースビルド、または nix
+
+==============================================================================
+3. セットアップ						*vime-setup*
+
+							*vime.setup()*
+require("vime").setup({opts})
+
+setup() を呼ぶだけで起動する。libanthy は自動探索されるため、多くの環境で
+{opts} は不要。見つからない／別の lib を使う場合のみ |vime-configuration| の
+anthy.lib を指定する。
+
+lazy.nvim の例: >lua
+
+	{
+	  "skanehira/vime.vim",
+	  config = function()
+	    require("vime").setup() -- lib は自動探索。必要なら anthy = { lib = ... }
+	  end,
+	}
+<
+libanthy が見つからない場合は OS 別の導入手順が |:messages| に案内される。
+
+==============================================================================
+4. 設定							*vime-configuration*
+
+setup() に渡せる設定と既定値: >lua
+
+	require("vime").setup({
+	  anthy = { lib = nil },          -- nil なら自動探索
+	  keymaps = {
+	    toggle       = "<C-j>",
+	    convert      = "<Space>",
+	    commit       = "<CR>",
+	    cancel       = "<C-g>",
+	    next_segment = "<C-f>",
+	    prev_segment = "<C-b>",
+	    expand       = "<C-o>",
+	    shrink       = "<C-i>",
+	    katakana     = "<F7>",
+	  },
+	  popup = {
+	    threshold = 3,              -- Space を N 回で候補一覧
+	    labels    = "asdfghjkl",    -- 一括選択ラベル
+	  },
+	})
+<
+						*vime-config-anthy.lib*
+anthy.lib		libanthy のパス（文字列）。nil で自動探索する。
+			探索順は $VIME_ANTHY_LIB → 標準パス（~/.local/lib 等）→
+			nix ストア glob。libanthy-unicode / libanthy の両名を探す。
+
+						*vime-config-keymaps*
+keymaps			各操作のキー（|vime-mappings|）。
+
+						*vime-config-popup*
+popup.threshold		候補一覧 popup を出すまでの <Space> 押下回数。
+popup.labels		候補一覧で候補を一括選択するラベル文字列。
+
+==============================================================================
+5. 使い方						*vime-usage*
+
+挿入モードで <C-j>（既定）を押すと日本語入力が ON になる。
+
+1. ローマ字を打つと未確定のかな（下線）になる。
+2. <Space> で変換を開始する（注目文節が反転）。
+3. <Space> を繰り返すと注目文節の候補を順送りする。既定では 3 回で候補一覧
+   popup が開き、ラベルキー（a/s/d…）で一括選択できる。
+4. <C-f>/<C-b> で注目文節を移動、<C-o>/<C-i> で文節を伸縮する。
+5. <CR> で確定する（全文節 commit され Anthy に学習される）。
+
+英数字をそのまま打ちたいときは <C-j> で OFF にする。大文字で始めると変換せず
+生の英字のまま入力でき（英字ラン）、確定は <CR> のみ。挿入モードを抜けると
+未確定は自動的に確定される。
+
+==============================================================================
+6. キーマッピング					*vime-mappings*
+
+日本語入力 ON 中の挿入モードキー（すべて |vime-configuration| で変更可）。
+
+<C-j>			日本語入力 ON。ON 中は未確定/変換を確定して OFF。
+英字(小文字)		ローマ字→かな（, 。 / 「 」 も変換）。
+英字(大文字始)		英字ラン（変換せず生英字。確定は <CR> のみ）。
+<Space>			未確定かな: 変換開始 / 変換中: 次候補（N 回で一覧）/
+			未確定なし: 通常のスペース。
+<C-f> <C-b>		変換中: 注目文節を次/前へ移動。
+<C-o> <C-i>		変換中: 注目文節を伸長/短縮。
+<CR>			変換中/未確定: 確定（学習）/ 未確定なし: 改行。
+<F7>			読みをカタカナに変換して確定。
+<C-g>			変換中: 変換を取消 / 未確定: 破棄。
+<BS> <C-h>		かな単位で 1 文字削除（英字ランは 1 文字）。
+<C-w> <C-u>		未確定をクリア（無ければ通常の単語/行削除）。
+<Esc>			未確定/変換中を確定して挿入モードを抜ける。
+
+==============================================================================
+7. ハイライト						*vime-highlights*
+
+VimeUnconfirmed		未確定のかな（既定: underline）。
+VimeSegment		変換中の注目文節（既定: reverse）。
+
+|:highlight| で上書きできる。例: >vim
+
+	highlight VimeSegment guibg=#3b4252 gui=NONE
+<
+==============================================================================
+8. ライセンス						*vime-license*
+
+MIT License. Copyright (c) 2026 skanehira.
+詳細は同梱の LICENSE を参照。
+
+==============================================================================
+vim:tw=78:ts=8:noet:ft=help:norl:
