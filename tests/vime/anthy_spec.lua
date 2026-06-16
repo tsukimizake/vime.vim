@@ -1,13 +1,6 @@
 local anthy = require("vime.anthy")
 
-local LIB = "/nix/store/m2z37mlz9rsh2azv9pny1860rpycic54-anthy-9100h/lib/libanthy.dylib"
-
-local function contains(list, v)
-  for _, x in ipairs(list) do
-    if x == v then return true end
-  end
-  return false
-end
+local LIB = assert(require("vime.config").find_anthy_lib(), "libanthy not found; set $VIME_ANTHY_LIB")
 
 describe("vime.anthy.setup", function()
   it("returns true for a valid library path", function()
@@ -26,12 +19,17 @@ describe("vime.anthy session", function()
     assert.is_true(anthy.setup(LIB))
   end)
 
-  it("converts yomi into segments with best and candidates", function()
+  it("converts yomi into multi-segment best/candidates", function()
     local s = anthy.new_session()
     local segs = s:convert("きょうはいいてんきだね")
-    assert.are.equal(3, #segs)
-    assert.are.equal("今日は", segs[1].best)
-    assert.is_true(contains(segs[2].candidates, "いい")) -- 候補に いい が含まれる
+    assert.is_true(#segs >= 2) -- 複数文節に分割される
+    assert.are.equal(segs[1].candidates[1], segs[1].best) -- best は第1候補
+    assert.is_true(#segs[1].candidates > 1) -- 候補が複数読める
+    local joined = {}
+    for _, seg in ipairs(segs) do
+      joined[#joined + 1] = seg.best
+    end
+    assert.are_not.equal("きょうはいいてんきだね", table.concat(joined)) -- かな→漢字変換された
     s:close()
   end)
 

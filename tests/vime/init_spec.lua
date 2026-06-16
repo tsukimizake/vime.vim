@@ -1,7 +1,7 @@
 local vime = require("vime")
 
 local api = vim.api
-local LIB = "/nix/store/m2z37mlz9rsh2azv9pny1860rpycic54-anthy-9100h/lib/libanthy.dylib"
+local LIB = assert(require("vime.config").find_anthy_lib(), "libanthy not found; set $VIME_ANTHY_LIB")
 
 describe("vime end-to-end", function()
   -- テスト独立性: 各テスト開始時は日本語入力 OFF にしておく
@@ -30,11 +30,12 @@ describe("vime end-to-end", function()
     vime.on_convert() -- Space → 変換
     vime.on_commit() -- Enter → 確定
 
-    -- 変換された(生かなでない)こと・先頭文節が安定して「今日は」になることを検証する。
-    -- 末尾候補(良い/いい 等)は anthy の領分なので anthy_spec で担保する。
+    -- 変換された(生かなでない)こと・先頭が安定して「今日」になることを検証する。
+    -- 文節境界や末尾候補は anthy の辞書バージョン依存なので絶対値では検証しない
+    -- (例: 9100h は「今日は…」、anthy-unicode は「今日…」と分割が異なる)。
     local result = api.nvim_buf_get_lines(buf, 0, 1, false)[1]
     assert.are_not.equal("きょうはいいてんきだね", result)
-    assert.are.equal("今日は", result:sub(1, #"今日は"))
+    assert.are.equal("今日", result:sub(1, #"今日"))
 
     vime.toggle() -- OFF
     assert.is_false(vime.is_enabled())
@@ -135,6 +136,15 @@ describe("vime end-to-end", function()
     end
     vime.on_kill("<C-u>") -- 未確定があるのでキャンセル
     assert.are.equal("", api.nvim_buf_get_lines(buf, 0, 1, false)[1])
+  end)
+
+  it("gives OS-specific install guidance when anthy is missing", function()
+    local mac = vime.install_hint("OSX")
+    assert.is_truthy(mac:find("anthy%-unicode"))
+    assert.is_truthy(mac:find("meson"))
+    local linux = vime.install_hint("Linux")
+    assert.is_truthy(linux:find("anthy%-unicode"))
+    assert.is_truthy(linux:find("dnf"))
   end)
 
   it("toggles off cleanly and leaves committed text", function()

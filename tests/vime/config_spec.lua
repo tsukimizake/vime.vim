@@ -21,13 +21,30 @@ describe("vime.config.merge", function()
 end)
 
 describe("vime.config.find_anthy_lib", function()
-  local LIB = "/nix/store/m2z37mlz9rsh2azv9pny1860rpycic54-anthy-9100h/lib/libanthy.dylib"
-
   it("returns the first existing path from candidates", function()
-    assert.are.equal(LIB, config.find_anthy_lib({ "/nonexistent.dylib", LIB }))
+    local existing = vim.fn.tempname()
+    vim.fn.writefile({}, existing)
+    assert.are.equal(existing, config.find_anthy_lib({ "/nonexistent.dylib", existing }))
+    vim.fn.delete(existing)
   end)
 
   it("returns nil when no candidate exists", function()
     assert.is_nil(config.find_anthy_lib({ "/nope1.dylib", "/nope2.dylib" }))
+  end)
+
+  it("prefers VIME_ANTHY_LIB over the default candidates", function()
+    local existing = vim.fn.tempname()
+    vim.fn.writefile({}, existing)
+    local saved = vim.env.VIME_ANTHY_LIB
+    vim.env.VIME_ANTHY_LIB = existing
+    assert.are.equal(existing, config.find_anthy_lib()) -- 既定探索でも環境変数が最優先
+    vim.env.VIME_ANTHY_LIB = saved
+    vim.fn.delete(existing)
+  end)
+
+  it("auto-discovers an installed libanthy on this machine", function()
+    local found = config.find_anthy_lib()
+    assert.is_not_nil(found)
+    assert.are.equal(1, vim.fn.filereadable(found))
   end)
 end)

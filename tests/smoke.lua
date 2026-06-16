@@ -4,14 +4,21 @@ local data = vim.fn.stdpath("data")
 vim.opt.runtimepath:append(vim.fn.getcwd())
 vim.opt.runtimepath:append(data .. "/lazy/plenary.nvim")
 
--- 学習を汚さないよう HOME を一時ディレクトリへ
+-- 実 HOME のうちに lib を自動探索する(この後 HOME を temp 化すると ~ 展開が変わるため先に解決)。
+local lib = require("vime.config").find_anthy_lib()
+
+-- 学習を汚さないよう HOME と XDG_CONFIG_HOME を一時ディレクトリへ
+-- (原 anthy=$HOME/.anthy、anthy-unicode=$XDG_CONFIG_HOME/anthy)
 local tmp = vim.fn.tempname()
 vim.fn.mkdir(tmp, "p")
 vim.env.HOME = tmp
+vim.env.XDG_CONFIG_HOME = tmp .. "/.config"
 
-require("vime").setup({
-  anthy = { lib = "/nix/store/m2z37mlz9rsh2azv9pny1860rpycic54-anthy-9100h/lib/libanthy.dylib" },
-})
+if not lib then
+  print(require("vime").install_hint())
+  return
+end
+require("vime").setup({ anthy = { lib = lib } })
 
 local api = vim.api
 local function feed(s)
@@ -39,7 +46,8 @@ do
   local buf = reset()
   feed("i<C-j>kyouhaiitenkidane <CR><Esc>")
   local l = lines(buf)[1] or ""
-  check("基本変換(今日は…)", l ~= "きょうはいいてんきだね" and l:sub(1, #"今日は") == "今日は")
+  -- 先頭「今日」のみ安定検証(文節境界は辞書バージョン依存: 9100h=今日は… / unicode=今日…)
+  check("基本変換(今日…)", l ~= "きょうはいいてんきだね" and l:sub(1, #"今日") == "今日")
 end
 
 -- 2) スペース(未確定なし)が入力できる
