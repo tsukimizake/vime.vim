@@ -89,5 +89,26 @@ do
   check("句読点(あ、)", (lines(buf)[1] or "") == "あ、")
 end
 
+-- 8) 大文字は英字のまま(API → API)
+do
+  local buf = reset()
+  feed("i<C-j>API<Esc>")
+  check("大文字は英字(API)", (lines(buf)[1] or "") == "API")
+end
+
+-- 9) かな+英字の混在(watashiAPI → わたしAPI)
+do
+  local buf = reset()
+  feed("i<C-j>watashiAPI<Esc>")
+  check("かな+英字混在(わたしAPI)", (lines(buf)[1] or "") == "わたしAPI")
+end
+
+-- 10) 英字ラン中のスペースは確定しない(Chrome devtool → そのまま)
+do
+  local buf = reset()
+  feed("i<C-j>Chrome devtool<CR><Esc>")
+  check("英字ラン中スペース(Chrome devtool)", (lines(buf)[1] or "") == "Chrome devtool")
+end
+
 print("==== smoke results ====")
 for _, r in ipairs(results) do print(r) end
