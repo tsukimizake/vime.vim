@@ -1,10 +1,14 @@
--- libanthy FFI ラッパ。副作用(FFI / ~/.anthy 学習)をこのモジュールに閉じ込める。
+-- libanthy FFI ラッパ。副作用(FFI / ~/.anthy 学習・私的辞書)をこのモジュールに閉じ込める。
 -- 公開 index は Lua 慣習で 1-based。内部で 0-based へ変換して anthy へ渡す。
 local ffi = require("ffi")
+local config = require("vime.config")
 
 local M = {}
 
 local ANTHY_UTF8_ENCODING = 2
+-- 私的辞書へ登録する単語の品詞(名詞)と頻度。名詞固定で取り込む。
+local DIC_WTYPE = "#T35"
+local DIC_FREQ = 1000
 
 local cdef_done = false
 local function ensure_cdef()
@@ -25,17 +29,24 @@ local function ensure_cdef()
     int anthy_get_segment(anthy_context_t, int, int, char *, int);
     int anthy_resize_segment(anthy_context_t, int, int);
     int anthy_commit_segment(anthy_context_t, int, int);
+    void anthy_dic_util_init(void);
+    int anthy_dic_util_set_encoding(int);
+    int anthy_priv_dic_add_entry(const char *, const char *, const char *, int);
   ]])
   cdef_done = true
 end
 
 local lib = nil
+local lib_path = nil
 local initialized = false
+-- 辞書登録ライブラリ(libanthydic)の状態。nil=未試行 / true/false=解決結果。
+local dic_lib = nil
+local dic_ready = nil
 
 -- ライブラリをロードし anthy を初期化する。成功で true。失敗でも例外を投げず false。
-function M.setup(lib_path)
+function M.setup(path)
   ensure_cdef()
-  local ok, loaded = pcall(ffi.load, lib_path)
+  local ok, loaded = pcall(ffi.load, path)
   if not ok then
     lib = nil
     return false
@@ -48,8 +59,79 @@ function M.setup(lib_path)
     end
     initialized = true
   end
+  if lib_path ~= path then -- lib が変わったら dic の解決をやり直す
+    dic_lib = nil
+    dic_ready = nil
+  end
   lib = loaded
+  lib_path = path
   return true
+end
+
+-- 辞書登録 API を持つライブラリを用意する。成功で true。失敗でも例外を投げず false。
+-- 本体 lib が dic シンボルを持てばそれを使い、無ければ libanthydic を別ロードする。
+local function ensure_dic()
+  if dic_ready ~= nil then
+    return dic_ready
+  end
+  dic_ready = false
+  if not lib then
+    return false
+  end
+  local cand = lib
+  if not pcall(function()
+    return cand.anthy_dic_util_init
+  end) then
+    local path = config.find_anthy_dic_lib(lib_path)
+    if not path then
+      return false
+    end
+    local ok, loaded = pcall(ffi.load, path)
+    if not ok then
+      return false
+    end
+    cand = loaded
+  end
+  if
+    not pcall(function()
+      cand.anthy_dic_util_init()
+      cand.anthy_dic_util_set_encoding(ANTHY_UTF8_ENCODING)
+    end)
+  then
+    return false
+  end
+  dic_lib = cand
+  dic_ready = true
+  return true
+end
+
+-- 読み(かな)→単語を私的辞書へ名詞として登録する。成功で true。失敗でも例外を投げず false。
+function M.register_word(yomi, word)
+  if not ensure_dic() then
+    return false
+  end
+  return pcall(function()
+    dic_lib.anthy_priv_dic_add_entry(yomi, word, DIC_WTYPE, DIC_FREQ)
+  end)
+end
+
+-- 変換が読む私的辞書 private_words_default のパスを返す。setup 済みが前提。失敗で nil。
+-- anthy-unicode は $XDG_CONFIG_HOME/anthy(未設定なら ~/.config/anthy)、原 anthy は ~/.anthy。
+-- 大量取り込みは per-entry API ではなくこのファイルを直接生成する(CLI から使用)。
+function M.private_dic_path()
+  if not lib_path then
+    return nil
+  end
+  local home = vim.uv.os_homedir()
+  if not home or home == "" then
+    return nil
+  end
+  if lib_path:find("unicode", 1, true) then
+    local xdg = vim.env.XDG_CONFIG_HOME
+    local base = (xdg and xdg ~= "") and xdg or (home .. "/.config")
+    return base .. "/anthy/private_words_default"
+  end
+  return home .. "/.anthy/private_words_default"
 end
 
 -- 現在の context から全文節の {best, candidates} を読み出す。

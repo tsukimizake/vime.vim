@@ -97,4 +97,21 @@ function M.find_anthy_lib(candidates)
   return nil
 end
 
+-- anthy の辞書登録ライブラリ(libanthydic)のパスを解決する。
+-- 登録 API(anthy_priv_dic_add_entry 等)は本体 libanthy ではなく libanthydic にある。
+-- 環境変数 VIME_ANTHY_DIC_LIB → main lib 名からの導出(libanthy→libanthydic) → nil。
+function M.find_anthy_dic_lib(main_lib)
+  local env = vim.env.VIME_ANTHY_DIC_LIB
+  if env and env ~= "" and vim.fn.filereadable(env) == 1 then
+    return env
+  end
+  if main_lib then
+    local derived = main_lib:gsub("libanthy", "libanthydic", 1)
+    if derived ~= main_lib and vim.fn.filereadable(derived) == 1 then
+      return derived
+    end
+  end
+  return nil
+end
+
 return M
