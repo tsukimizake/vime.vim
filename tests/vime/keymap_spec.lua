@@ -144,6 +144,140 @@ describe("vime.keymap", function()
     assert.is_true(calls.prev)
   end)
 
+  it("attach_converting maps converting-only keys to handlers", function()
+    local buf = api.nvim_create_buf(false, true)
+    local calls = {}
+    local handlers = {
+      next_segment = function()
+        calls.next_segment = true
+      end,
+      prev_segment = function()
+        calls.prev_segment = true
+      end,
+      next_candidate = function()
+        calls.next_candidate = true
+      end,
+      prev_candidate = function()
+        calls.prev_candidate = true
+      end,
+      expand = function()
+        calls.expand = true
+      end,
+      shrink = function()
+        calls.shrink = true
+      end,
+    }
+    keymap.attach_converting(buf, config.merge(nil), handlers)
+
+    for _, case in ipairs({
+      { upper = "<C-F>", lower = "<C-f>", call = "next_segment" },
+      { upper = "<C-B>", lower = "<C-b>", call = "prev_segment" },
+      { upper = "<C-N>", lower = "<C-n>", call = "next_candidate" },
+      { upper = "<C-P>", lower = "<C-p>", call = "prev_candidate" },
+      { upper = "<C-O>", lower = "<C-o>", call = "expand" },
+      { upper = "<C-I>", lower = "<C-i>", call = "shrink" },
+    }) do
+      local m = find_map(buf, case.upper) or find_map(buf, case.lower)
+      assert.is_not_nil(m, case.lower .. " should be mapped")
+      m.callback()
+      assert.is_true(calls[case.call], case.call .. " handler should be called")
+    end
+  end)
+
+  it("attach_converting is idempotent", function()
+    local buf = api.nvim_create_buf(false, true)
+    local handlers = {
+      next_segment = function() end,
+      prev_segment = function() end,
+      next_candidate = function() end,
+      prev_candidate = function() end,
+      expand = function() end,
+      shrink = function() end,
+    }
+    keymap.attach_converting(buf, config.merge(nil), handlers)
+    keymap.attach_converting(buf, config.merge(nil), handlers) -- 2回目も例外を出さない
+
+    keymap.detach_converting(buf)
+    assert.is_nil(find_map(buf, "<C-F>") or find_map(buf, "<C-f>"))
+  end)
+
+  it("detach_converting removes only converting-only keys", function()
+    local buf = api.nvim_create_buf(false, true)
+    local function noop() end
+    local common_handlers = {
+      input = noop,
+      convert = noop,
+      commit = noop,
+      cancel = noop,
+      backspace = noop,
+      next_segment = noop,
+      prev_segment = noop,
+      expand = noop,
+      shrink = noop,
+      katakana = noop,
+      alphabet = noop,
+      next_candidate = noop,
+      prev_candidate = noop,
+    }
+    keymap.attach(buf, config.merge(nil), common_handlers)
+    keymap.attach_converting(buf, config.merge(nil), {
+      next_segment = noop,
+      prev_segment = noop,
+      next_candidate = noop,
+      prev_candidate = noop,
+      expand = noop,
+      shrink = noop,
+    })
+    keymap.detach_converting(buf)
+
+    -- 共通キーは残る
+    assert.is_not_nil(find_map(buf, "a"))
+    assert.is_not_nil(find_map(buf, "<CR>"))
+    assert.is_not_nil(find_map(buf, "<C-G>") or find_map(buf, "<C-g>"))
+    -- converting 限定キーは消える
+    assert.is_nil(find_map(buf, "<C-F>") or find_map(buf, "<C-f>"))
+    assert.is_nil(find_map(buf, "<C-O>") or find_map(buf, "<C-o>"))
+  end)
+
+  it("detach_converting is idempotent when called without attach", function()
+    local buf = api.nvim_create_buf(false, true)
+    keymap.detach_converting(buf) -- attach 前でも例外を出さない
+    keymap.detach_converting(buf) -- 二度呼んでも安全
+  end)
+
+  it("detach also removes converting-only keys", function()
+    local buf = api.nvim_create_buf(false, true)
+    local function noop() end
+    local common_handlers = {
+      input = noop,
+      convert = noop,
+      commit = noop,
+      cancel = noop,
+      backspace = noop,
+      next_segment = noop,
+      prev_segment = noop,
+      expand = noop,
+      shrink = noop,
+      katakana = noop,
+      alphabet = noop,
+      next_candidate = noop,
+      prev_candidate = noop,
+    }
+    keymap.attach(buf, config.merge(nil), common_handlers)
+    keymap.attach_converting(buf, config.merge(nil), {
+      next_segment = noop,
+      prev_segment = noop,
+      next_candidate = noop,
+      prev_candidate = noop,
+      expand = noop,
+      shrink = noop,
+    })
+    keymap.detach(buf)
+
+    assert.is_nil(find_map(buf, "a"))
+    assert.is_nil(find_map(buf, "<C-F>") or find_map(buf, "<C-f>"))
+  end)
+
   it("maps F10 to alphabet conversion", function()
     local buf = api.nvim_create_buf(false, true)
     local calls = {}

@@ -14,7 +14,19 @@ end
 -- lhs として特別扱いが要る文字のエスケープ。
 local SPECIAL_LHS = { ["<"] = "<lt>", ["|"] = "<Bar>", ["\\"] = "<Bslash>" }
 
-local registered = {} -- buf -> {lhs,...}
+-- converting 状態でのみバッファに張るキー(config.keymaps 上の名前)。
+-- composing/ASCII 直入力では vime が握らず、ユーザの insert モードマッピング/Vim 既定が生きる。
+local CONVERTING_ONLY = {
+  "next_segment",
+  "prev_segment",
+  "next_candidate",
+  "prev_candidate",
+  "expand",
+  "shrink",
+}
+
+local registered = {} -- buf -> {lhs,...} (常時マッピング)
+local registered_converting = {} -- buf -> {lhs,...} (converting 限定マッピング)
 
 -- buf にバッファローカルの挿入モードマッピングを張る。
 function M.attach(buf, config, handlers)
@@ -54,8 +66,9 @@ function M.attach(buf, config, handlers)
   registered[buf] = lhs_list
 end
 
--- buf のマッピングを外す。
+-- buf のマッピングを外す。converting 限定マッピングも合わせて掃除する。
 function M.detach(buf)
+  M.detach_converting(buf)
   local lhs_list = registered[buf]
   if not lhs_list then
     return
@@ -64,6 +77,34 @@ function M.detach(buf)
     pcall(vim.keymap.del, "i", lhs, { buffer = buf })
   end
   registered[buf] = nil
+end
+
+-- converting 状態で必要なキーだけを追加でマップする。
+-- 同じ buf に対する二重 attach は冪等(2 回目以降は何もしない)。
+function M.attach_converting(buf, config, handlers)
+  if registered_converting[buf] then
+    return
+  end
+  local lhs_list = {}
+  local km = config.keymaps
+  for _, name in ipairs(CONVERTING_ONLY) do
+    local lhs = km[name]
+    vim.keymap.set("i", lhs, handlers[name], { buffer = buf, nowait = true, silent = true })
+    lhs_list[#lhs_list + 1] = lhs
+  end
+  registered_converting[buf] = lhs_list
+end
+
+-- converting 限定のマッピングだけを外す。未 attach なら何もしない(冪等)。
+function M.detach_converting(buf)
+  local lhs_list = registered_converting[buf]
+  if not lhs_list then
+    return
+  end
+  for _, lhs in ipairs(lhs_list) do
+    pcall(vim.keymap.del, "i", lhs, { buffer = buf })
+  end
+  registered_converting[buf] = nil
 end
 
 return M
