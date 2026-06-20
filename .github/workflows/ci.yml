@@ -28,14 +28,12 @@ jobs:
           meson setup build --prefix=$HOME/.local --sysconfdir=$HOME/.local/etc -Demacs=disabled
           meson compile -C build
           meson install -C build
-          # build 後の lib 名を環境変数 VIME_ANTHY_LIB に固定し、config.find_anthy_lib()
-          # の探索結果と一致させる。LD_LIBRARY_PATH も dlopen 用に通す。
-          ls -la "$HOME/.local/lib" >&2
-          lib=$(ls "$HOME/.local/lib"/libanthy-unicode.so 2>/dev/null \
-                || ls "$HOME/.local/lib"/libanthy-utf.so 2>/dev/null \
-                || ls "$HOME/.local/lib"/libanthy.so)
+          # ubuntu の meson は libdir を multiarch(x86_64-linux-gnu)に振るので、
+          # 単純な ~/.local/lib 直下ではなくサブディレクトリも含めて symlink を拾う。
+          lib=$(find "$HOME/.local/lib" -name 'libanthy-unicode.so' -type l 2>/dev/null | head -1)
+          libdir=$(dirname "$lib")
           echo "VIME_ANTHY_LIB=$lib" >> "$GITHUB_ENV"
-          echo "LD_LIBRARY_PATH=$HOME/.local/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$libdir:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
 
       - name: Setup Neovim
         uses: rhysd/action-setup-vim@febef33995d6649302e9d88dda81e071b68f16a7 # v1.6.1
