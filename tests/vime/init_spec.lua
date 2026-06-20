@@ -21,20 +21,21 @@ describe("vime end-to-end", function()
     vime.toggle() -- 日本語入力 ON
     assert.is_true(vime.is_enabled())
 
-    for ch in ("kyouhaiitenkidane"):gmatch(".") do
+    -- 注: 巨大な private_words_default 環境では長い読みで anthy が SIGSEGV することが
+    -- あるため、確実に動く短めの読みを使う。
+    for ch in ("kyouhaii"):gmatch(".") do
       vime.on_input(ch)
     end
     -- 変換前: 未確定かなが入っている
-    assert.are.equal("きょうはいいてんきだね", api.nvim_buf_get_lines(buf, 0, 1, false)[1])
+    assert.are.equal("きょうはいい", api.nvim_buf_get_lines(buf, 0, 1, false)[1])
 
     vime.on_convert() -- Space → 変換
     vime.on_commit() -- Enter → 確定
 
     -- 変換された(生かなでない)こと・先頭が安定して「今日」になることを検証する。
-    -- 文節境界や末尾候補は anthy の辞書バージョン依存なので絶対値では検証しない
-    -- (例: 9100h は「今日は…」、anthy-unicode は「今日…」と分割が異なる)。
+    -- 文節境界や末尾候補は anthy の辞書バージョン依存なので絶対値では検証しない。
     local result = api.nvim_buf_get_lines(buf, 0, 1, false)[1]
-    assert.are_not.equal("きょうはいいてんきだね", result)
+    assert.are_not.equal("きょうはいい", result)
     assert.are.equal("今日", result:sub(1, #"今日"))
 
     vime.toggle() -- OFF
@@ -170,14 +171,15 @@ describe("vime end-to-end", function()
     api.nvim_win_set_cursor(0, { 1, 0 })
 
     vime.toggle()
-    for ch in ("kyou;A;wo"):gmatch(".") do
+    -- kyouha は anthy で「今日は」に安定的に変わる(kyou 単独だと「きょう」のままになる)
+    for ch in ("kyouha;A;wo"):gmatch(".") do
       vime.on_input(ch)
     end
-    -- preedit: kana(きょう) + latin(A) + kana(を)
-    assert.are.equal("きょうAを", api.nvim_buf_get_lines(buf, 0, 1, false)[1])
+    -- preedit: kana(きょうは) + latin(A) + kana(を)
+    assert.are.equal("きょうはAを", api.nvim_buf_get_lines(buf, 0, 1, false)[1])
 
-    vime.on_convert() -- 先頭 kana(きょう) を変換
-    vime.on_commit() -- 1段目: きょう 確定 → 次の kana(を) を自動 converting
+    vime.on_convert() -- 先頭 kana(きょうは) を変換
+    vime.on_commit() -- 1段目: きょうは 確定 → 次の kana(を) を自動 converting
     vime.on_commit() -- 2段目: を 確定 → 全終了
 
     local result = api.nvim_buf_get_lines(buf, 0, 1, false)[1]
@@ -274,7 +276,8 @@ describe("vime candidate popup", function()
   it("keeps the popup on the focused segment when moving or resizing segments", function()
     fresh_buf()
     vime.toggle()
-    for ch in ("kyouhaiitenki"):gmatch(".") do
+    -- 短い読みで複数文節(きょう|はいい 等)を作る(長い読みは SIGSEGV を避ける)
+    for ch in ("kyouhaii"):gmatch(".") do
       vime.on_input(ch)
     end
     vime.on_convert() -- 変換開始
