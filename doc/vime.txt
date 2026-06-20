@@ -14,7 +14,8 @@ CONTENTS						*vime* *vime-contents*
 	6. 使い方 ........................... |vime-usage|
 	7. キーマッピング ................... |vime-mappings|
 	8. ハイライト ....................... |vime-highlights|
-	9. ライセンス ....................... |vime-license|
+	9. モード API ....................... |vime-mode-api|
+	10. ライセンス ...................... |vime-license|
 
 ==============================================================================
 1. 概要							*vime-introduction*
@@ -87,6 +88,17 @@ setup() に渡せる設定と既定値: >lua
 	    prev_candidate = "<C-p>",
 	    katakana     = "<F7>",
 	    alphabet     = "<F10>",
+	    ascii_toggle = ";",
+	  },
+	  mode_notify = {
+	    enabled  = true,
+	    duration = 1000,             -- ms
+	    labels   = {
+	      direct   = "直",
+	      hiragana = "あ",
+	      ascii    = "A",
+	    },
+	    highlight = nil,              -- nil なら緑デフォルト
 	  },
 	})
 <
@@ -97,6 +109,18 @@ anthy.lib		libanthy のパス（文字列）。nil で自動探索する。
 
 						*vime-config-keymaps*
 keymaps			各操作のキー（|vime-mappings|）。
+
+						*vime-config-mode_notify*
+mode_notify		モード切替時にカーソル下へ短時間ラベルを表示する設定。
+			enabled=false で表示を無効化できる（独自ステータスライン等
+			で表示する場合は |vime-mode-api| を参照）。labels はモード
+			名(direct/hiragana/ascii)→表示文字の対応で、部分的な上書き
+			が効く。変換中は候補一覧 popup 側でシグナルされるため、
+			モード通知は出さない。highlight に |nvim_set_hl()| 互換テーブ
+			ル(例 `{ bg = "#1e88e5", fg = "#ffffff", bold = true }`)を渡
+			すと |hl-VimeModeNotify| を上書きできる(nil は緑デフォルト)。
+			ホスト |api-floatwin| の中で入力していても、mode notify は
+			そのホストより前面の zindex で出るので隠れない。
 
 SKK 辞書の取り込みは設定ではなく CLI で行う（|vime-dictionary|）。
 
@@ -190,13 +214,64 @@ lazy.nvim なら ~/.local/share/nvim/lazy/vime.nvim）。 >sh
 
 VimeUnconfirmed		未確定のかな（既定: underline）。
 VimeSegment		変換中の注目文節（既定: reverse）。
+VimeModeNotify		モード切替時に出る通知 popup（既定: 緑背景・白文字・bold）。
+			config の |vime-config-mode_notify| .highlight、または
+			|:highlight| で上書きできる。
 
 |:highlight| で上書きできる。例: >vim
 
 	highlight VimeSegment guibg=#3b4252 gui=NONE
+	highlight VimeModeNotify guibg=#1e88e5 guifg=#ffffff gui=bold
 <
 ==============================================================================
-9. ライセンス						*vime-license*
+9. モード API						*vime-mode-api*
+
+ステータスラインや独自 UI で「いま何モードか」を表示したいときに使う。
+mode_notify による自動 popup を切ったうえで好きな方法で表示できる。
+
+								*vime.mode()*
+require("vime").mode()
+
+現在のモードをテーブルで返す。 >lua
+
+	{
+	  name    = "direct" | "hiragana" | "ascii",
+	  enabled = boolean,
+	  state   = "composing" | "converting" | nil,  -- direct のとき nil
+	  ascii   = boolean,
+	  latin   = boolean,                            -- 英字ラン中か
+	}
+<
+変換中も name は "hiragana" のまま（state だけが "converting" になる）。
+これは候補一覧 popup 側で十分シグナルされているため、ステータスラインを
+変換中にチカチカさせない設計上の選択。細かく区別したい場合は state を見る。
+ステータスライン例（lualine）: >lua
+
+	require("lualine").setup({
+	  sections = {
+	    lualine_x = { function() return require("vime").mode().name end },
+	  },
+	})
+<
+
+							*VimeModeChanged*
+モード名(name)が変わると User イベント VimeModeChanged が発火する。
+args.data に |vime.mode()| と同じテーブルが入る。 >lua
+
+	vim.api.nvim_create_autocmd("User", {
+	  pattern = "VimeModeChanged",
+	  callback = function(args)
+	    -- args.data = { name = "ascii", enabled = true, ... }
+	    vim.cmd("redrawstatus")
+	  end,
+	})
+<
+自前で表示するなら mode_notify を切る: >lua
+
+	require("vime").setup({ mode_notify = { enabled = false } })
+<
+==============================================================================
+10. ライセンス						*vime-license*
 
 MIT License. Copyright (c) 2026 skanehira.
 詳細は同梱の LICENSE を参照。

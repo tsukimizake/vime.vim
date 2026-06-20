@@ -58,6 +58,8 @@ meson compile -C build && meson install -C build
 
 挿入モードで `<C-j>` → ローマ字入力 → `<Space>` で変換 → `<CR>` で確定。文節移動・伸縮・カタカナ確定などのキー操作は `:help vime-usage` / `:help vime-mappings`。
 
+モード切替時はカーソル下に短時間ラベル（既定: 直/あ/A）が出る。ステータスラインに自分で表示したい場合は `require("vime").mode()` と `User VimeModeChanged` autocmd を使う → `:help vime-mode-api`。
+
 Anthy の既定辞書に無い固有名詞などは、SKK 辞書（JISYO JSON）を取り込んで候補に追加できる → `:help vime-dictionary`。
 
 ## 開発
