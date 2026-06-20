@@ -1,10 +1,8 @@
-
-
-https://github.com/user-attachments/assets/bb89ec5c-1ad2-44d0-8ab9-81774aa39ea0
-
 # vime.nvim
 
 英字を一気に日本語へ変換するモード式 IME の Neovim プラグイン。挿入モードのまま、OS の IME を切り替えずに日本語を入力できる。
+
+https://github.com/user-attachments/assets/bb89ec5c-1ad2-44d0-8ab9-81774aa39ea0
 
 ```
 kyouhaiitenkidane → きょうはいいてんきだね → 今日は良い天気だね
