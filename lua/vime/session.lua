@@ -482,6 +482,27 @@ function Session:commit_alphabet()
   return text
 end
 
+-- 注目文節の元読み(yomi)を返す。converting でなければ nil。
+-- 辞書登録(register_word)の読み側として使う。
+function Session:current_segment_yomi()
+  if self._state ~= "converting" then
+    return nil
+  end
+  return self.anthy:segment_yomi(self.seg_index)
+end
+
+-- 注目文節の表示候補を word に上書きしてから一括 commit する。
+-- 辞書登録した単語で現在の入力を確定させるために使う。converting でなければ通常 commit と同じ。
+-- anthy_commit_segment は元の choice 番号で呼ばれるため、内部状態・学習は壊れない。
+function Session:commit_with_replacement(word)
+  if self._state ~= "converting" then
+    return self:commit()
+  end
+  local i = self.seg_index
+  self._segments[i].candidates[self.choices[i]] = word
+  return self:commit()
+end
+
 -- 取消。converting なら注目 kana の変換を取り消し composing へ戻す(confirmed/latin は保持)。
 -- composing なら全未確定(buf)を破棄。
 function Session:cancel()

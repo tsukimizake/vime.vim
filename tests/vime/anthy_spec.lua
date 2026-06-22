@@ -58,6 +58,19 @@ describe("vime.anthy session", function()
     end)
     s:close()
   end)
+
+  it("returns the original yomi of each segment and they concatenate back to the input", function()
+    local s = anthy.new_session()
+    local yomi = "きょうはいい"
+    local segs = s:convert(yomi)
+    assert.is_true(#segs >= 2) -- 複数文節への分割を前提
+    local parts = {}
+    for i = 1, #segs do
+      parts[#parts + 1] = s:segment_yomi(i)
+    end
+    assert.are.equal(yomi, table.concat(parts))
+    s:close()
+  end)
 end)
 
 -- ユーザ辞書(私的辞書)に登録された語が候補に出るかをカウントする。

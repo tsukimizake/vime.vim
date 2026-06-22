@@ -6,6 +6,8 @@ local config = require("vime.config")
 local M = {}
 
 local ANTHY_UTF8_ENCODING = 2
+-- anthy_get_segment の第3引数(nth)に渡すと未変換の元読み(yomi)を取得する特殊値。
+local NTH_UNCONVERTED_CANDIDATE = -1
 -- 私的辞書へ登録する単語の品詞(名詞)と頻度。名詞固定で取り込む。
 local DIC_WTYPE = "#T35"
 local DIC_FREQ = 1000
@@ -182,6 +184,14 @@ function Session:commit(choices)
   for i, cand in ipairs(choices) do
     self.lib.anthy_commit_segment(self.ctx, i - 1, cand - 1)
   end
+end
+
+-- 第 seg 文節(1-based)の元読み(yomi)を返す。convert 済みであることが前提。
+function Session:segment_yomi(seg)
+  local need = self.lib.anthy_get_segment(self.ctx, seg - 1, NTH_UNCONVERTED_CANDIDATE, nil, 0)
+  local buf = ffi.new("char[?]", need + 1)
+  self.lib.anthy_get_segment(self.ctx, seg - 1, NTH_UNCONVERTED_CANDIDATE, buf, need + 1)
+  return ffi.string(buf)
 end
 
 -- context を解放する。

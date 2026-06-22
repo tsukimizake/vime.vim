@@ -375,6 +375,48 @@ describe("vime.session CONVERTING (real anthy)", function()
     assert.are.equal("あ", s:preedit())
   end)
 
+  it("returns nil for the focused segment yomi while composing", function()
+    local s = new()
+    type_in(s, "kyou")
+    assert.is_nil(s:current_segment_yomi())
+  end)
+
+  it("returns each segment yomi concatenating back to the typed reading while converting", function()
+    local s = new()
+    type_in(s, "kyouhaii") -- きょうはいい → 複数文節を期待
+    s:start_conversion()
+    local parts = { s:current_segment_yomi() }
+    while s:segments().current < #s:segments().list do
+      s:next_segment()
+      parts[#parts + 1] = s:current_segment_yomi()
+    end
+    assert.are.equal("きょうはいい", table.concat(parts))
+  end)
+
+  it("commit_with_replacement substitutes the focused segment with the given word", function()
+    local s = new()
+    type_in(s, "kyouhaii") -- 複数文節想定。先頭文節が注目
+    s:start_conversion()
+    local list = s:segments().list
+    assert.is_true(#list >= 2)
+    local tail = {}
+    for i = 2, #list do
+      tail[#tail + 1] = list[i]
+    end
+    local final = s:commit_with_replacement("XYZ")
+    assert.are.equal("composing", s:state())
+    assert.are.equal("", s:preedit())
+    assert.are.equal("XYZ" .. table.concat(tail), final) -- 注目=XYZ、他文節は既定で確定
+  end)
+
+  it("commit_with_replacement falls back to commit when not converting", function()
+    local s = new()
+    type_in(s, "aiueo")
+    local final = s:commit_with_replacement("anything")
+    assert.are.equal("あいうえお", final) -- 注目文節が無いので word は無視され通常 commit
+    assert.are.equal("composing", s:state())
+  end)
+
   -- 学習は後続の既定を変えうるため describe 末尾に置く(この spec の HOME は隔離済み)。
   it("learns the committed candidate so it becomes the next default", function()
     local s = new()
